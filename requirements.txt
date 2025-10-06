@@ -8,3 +8,4 @@ prompt-toolkit # for lizard monitor
 pynmea2
 shapely
 uvicorn == 0.28.1
+nicegui ==2.24.2
