@@ -263,11 +263,13 @@ class GnssConfiguration:
         y: -0.255
         z: 0.6225
         yaw: 0.0
+        hardware_type: 'septentrio'
     """
     x: float = 0.041
     y: float = -0.255
     z: float = 0.6225
     yaw: float = 0.0
+    hardware_type: Literal['septentrio', 'f9p'] = 'septentrio'
 
     @property
     def pose(self) -> Pose:
@@ -527,3 +529,4 @@ class FieldFriendConfiguration:
     gnss: GnssConfiguration | None = None
     imu: ImuConfiguration | None = None
     driver: DriveParameters = field(default_factory=create_drive_parameters)
+
