@@ -1,7 +1,7 @@
 fiona
 geopandas
 geopy
-git+https://github.com/Agroecology-Lab/rosys.git
+git+https://github.com/Agroecology-Lab/rosys.git@main
 icecream
 pillow
 prompt-toolkit # for lizard monitor
@@ -9,3 +9,4 @@ pynmea2
 shapely
 uvicorn == 0.28.1
 nicegui ==2.24.2
+pyubx2>=2.7.0 
