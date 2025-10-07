@@ -12,6 +12,11 @@ from rosys.event import Event
 from rosys.geometry import GeoPoint, GeoReference
 from rosys.hardware.gnss import GnssHardware, GnssSimulation
 
+try:
+    from rosys.hardware.gnss_zedf9p import GnssZEDF9P
+except ImportError:
+    GnssZEDF9P = None  # Will be None if using zauberzeug/rosys without F9P support
+
 from .app_controls import AppControls as app_controls
 from .automations import AutomationWatcher, FieldProvider, KpiProvider, PlantLocator, PlantProvider, Puncher
 from .automations.implements import Implement, Recorder, Tornado, WeedingScrew, WeedingSprayer
@@ -45,7 +50,7 @@ class System(rosys.persistence.Persistable):
         self.detector: DetectorHardware | rosys.vision.DetectorSimulation | None = None
         self.circle_sight_detector: DetectorHardware | rosys.vision.DetectorSimulation | None = None
         self.update_gnss_reference(reference=GeoReference(GeoPoint.from_degrees(51.983204032849706, 7.434321368936861)))
-        self.gnss: GnssHardware | GnssSimulation | None = None
+        self.gnss: GnssHardware | GnssSimulation | Any | None = None  # Any to support GnssZEDF9P
         self.field_friend: FieldFriend
         self._current_navigation: WaypointNavigation | None = None
         self.implements: dict[str, Implement] = {}
@@ -315,13 +320,33 @@ class System(rosys.persistence.Persistable):
 
         rosys.on_repeat(watch_robot, 1.0)
 
-    def setup_gnss(self, wheels: rosys.hardware.WheelsSimulation | None = None) -> GnssHardware | GnssSimulation | None:
+    def setup_gnss(self, wheels: rosys.hardware.WheelsSimulation | None = None) -> GnssHardware | GnssSimulation | Any | None:
         if self.config.gnss is None:
             return None
+        
         if not rosys.is_simulation():
-            gnss_hardware = GnssHardware(antenna_pose=self.config.gnss.pose)
+            # Check if F9P hardware is configured
+            if hasattr(self.config.gnss, 'hardware_type') and self.config.gnss.hardware_type == 'f9p':
+                if GnssZEDF9P is None:
+                    self.log.error('F9P hardware requested but GnssZEDF9P not available. '
+                                   'Please update to Agroecology-Lab/rosys fork or install pyubx2.')
+                    self.log.info('Falling back to standard GnssHardware.')
+                    gnss_hardware = GnssHardware(antenna_pose=self.config.gnss.pose)
+                else:
+                    self.log.info('Using GnssZEDF9P for F9P hardware.')
+                    gnss_hardware = GnssZEDF9P(
+                        antenna_pose=self.config.gnss.pose,
+                        reconnect_interval=3.0
+                    )
+            else:
+                # Default to Septentrio hardware
+                self.log.info('Using standard GnssHardware for Septentrio receiver.')
+                gnss_hardware = GnssHardware(antenna_pose=self.config.gnss.pose)
+            
             gnss_hardware.MAX_TIMESTAMP_DIFF = 0.25
             return gnss_hardware
+        
+        # Simulation mode
         assert isinstance(wheels, rosys.hardware.WheelsSimulation)
         if rosys.is_test:
             # NOTE: quick fix for https://github.com/zauberzeug/field_friend/issues/348
@@ -367,3 +392,4 @@ class System(rosys.persistence.Persistable):
         if self.automator.is_running:
             return
         gc.collect()
+
